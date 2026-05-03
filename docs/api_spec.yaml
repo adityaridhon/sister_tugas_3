@@ -1,0 +1,244 @@
+openapi: 3.0.0
+info:
+  title: Distributed Sync System API
+  description: API documentation untuk Distributed Lock, Queue, dan Cache.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8001
+    description: Cache node 1
+  - url: http://localhost:8002
+    description: Cache node 2
+  - url: http://localhost:8003
+    description: Cache node 3
+  - url: http://localhost:8004
+    description: Queue node 1
+  - url: http://localhost:8005
+    description: Queue node 2
+  - url: http://localhost:8006
+    description: Queue node 3
+  - url: http://localhost:8007
+    description: Lock node 1
+  - url: http://localhost:8008
+    description: Lock node 2
+  - url: http://localhost:8009
+    description: Lock node 3
+
+x-cache-servers: &cache_servers
+  - url: http://localhost:8001
+    description: Cache node 1
+  - url: http://localhost:8002
+    description: Cache node 2
+  - url: http://localhost:8003
+    description: Cache node 3
+
+x-queue-servers: &queue_servers
+  - url: http://localhost:8004
+    description: Queue node 1
+  - url: http://localhost:8005
+    description: Queue node 2
+  - url: http://localhost:8006
+    description: Queue node 3
+
+x-lock-servers: &lock_servers
+  - url: http://localhost:8007
+    description: Lock node 1
+  - url: http://localhost:8008
+    description: Lock node 2
+  - url: http://localhost:8009
+    description: Lock node 3
+
+x-common-servers: &common_servers
+  - url: http://localhost:8001
+    description: Cache node 1
+  - url: http://localhost:8002
+    description: Cache node 2
+  - url: http://localhost:8003
+    description: Cache node 3
+  - url: http://localhost:8004
+    description: Queue node 1
+  - url: http://localhost:8005
+    description: Queue node 2
+  - url: http://localhost:8006
+    description: Queue node 3
+  - url: http://localhost:8007
+    description: Lock node 1
+  - url: http://localhost:8008
+    description: Lock node 2
+  - url: http://localhost:8009
+    description: Lock node 3
+
+paths:
+  /status:
+    get:
+      summary: Cek Status Node
+      servers: *common_servers
+      responses:
+        "200":
+          description: Status node berhasil diambil
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Endpoint untuk verifikasi layanan node hidup (dari `BaseNode`).
+      servers: *common_servers
+      responses:
+        "200":
+          description: Node sehat
+
+  /message:
+    post:
+      summary: Internal message endpoint
+      description: Endpoint internal untuk komunikasi antarnode (POST JSON).
+      servers: *common_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Message diterima
+
+  /lock:
+    post:
+      summary: Minta Kunci (Acquire Lock)
+      servers: *lock_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resource:
+                  type: string
+                  example: "ruang_sekret_hmif"
+                client_id:
+                  type: string
+                  example: "divisi_humas"
+                lock_type:
+                  type: string
+                  enum: [exclusive, shared]
+                  example: "exclusive"
+      responses:
+        "200":
+          description: Lock berhasil didapatkan
+
+  /unlock:
+    post:
+      summary: Lepas Kunci (Release Lock)
+      servers: *lock_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resource:
+                  type: string
+                  example: "ruang_sekret_hmif"
+                client_id:
+                  type: string
+                  example: "divisi_humas"
+      responses:
+        "200":
+          description: Lock berhasil dilepas
+
+  /queue/push:
+    post:
+      summary: Tambah Tugas (Producer)
+      description: Memasukkan tugas baru ke dalam antrean terdistribusi.
+      servers: *queue_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                job_id:
+                  type: string
+                  example: "email_sertifikat_001"
+                payload:
+                  type: string
+                  example: "Kirim ke anton@itk.ac.id"
+      responses:
+        "200":
+          description: Tugas sukses dimasukkan
+
+  /queue/pop:
+    get:
+      summary: Ambil Tugas (Consumer)
+      description: Node mengambil dan mengerjakan satu tugas dari antreannya.
+      servers: *queue_servers
+      responses:
+        "200":
+          description: Berhasil mengambil tugas
+
+  /queue/ack:
+    post:
+      summary: Acknowledge Tugas (Selesai)
+      description: Memberi tahu server bahwa tugas berhasil diselesaikan agar tidak direcovery.
+      servers: *queue_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                raw_data:
+                  type: string
+                  example: '{"job_id": "email_sertifikat_001", "payload": "Kirim ke anton@itk.ac.id"}'
+      responses:
+        "200":
+          description: Tugas sukses di-ACK dan dihapus permanen
+
+  /cache/set:
+    post:
+      summary: Set Data Cache (MESI Write)
+      description: Menulis data. Akan mengirim sinyal Invalidate ke node lain dan state menjadi M (Modified).
+      servers: *cache_servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  example: "info_beasiswa"
+                value:
+                  type: string
+                  example: "Pendaftaran ditutup besok."
+      responses:
+        "200":
+          description: Cache sukses disimpan
+
+  /cache/get/{key}:
+    get:
+      summary: Get Data Cache (MESI Read)
+      description: Membaca data. State akan diatur menjadi E (Exclusive) atau S (Shared) berdasarkan node lain.
+      servers: *cache_servers
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+          example: "info_beasiswa"
+      responses:
+        "200":
+          description: Berhasil mengambil data
+
+  /cache/metrics:
+    get:
+      summary: Lihat Performa Cache & LRU
+      description: Mengambil data metrics (Hits, Misses, Evictions) dan isi cache saat ini.
+      servers: *cache_servers
+      responses:
+        "200":
+          description: Metrics berhasil diambil

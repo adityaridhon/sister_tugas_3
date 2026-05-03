@@ -1,0 +1,6 @@
+aiohttp
+aioredis
+python-dotenv
+pytest
+pytest-asyncio
+redis

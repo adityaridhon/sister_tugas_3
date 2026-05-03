@@ -1,0 +1,220 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:${REDIS_PORT:-6379}"
+    networks:
+      - dist-net
+  cache1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cache
+    env_file:
+      - ../.env
+    command: python -m src.nodes.cache_node
+    environment:
+      - NODE_ID=cache1
+      - PORT=${CACHE1_PORT:-8001}
+      - PEERS=${PEERS_CACHE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${CACHE1_PORT:-8001}:${CACHE1_PORT:-8001}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  cache2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cache
+    env_file:
+      - ../.env
+    command: python -m src.nodes.cache_node
+    environment:
+      - NODE_ID=cache2
+      - PORT=${CACHE2_PORT:-8002}
+      - PEERS=${PEERS_CACHE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${CACHE2_PORT:-8002}:${CACHE2_PORT:-8002}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  cache3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cache
+    env_file:
+      - ../.env
+    command: python -m src.nodes.cache_node
+    environment:
+      - NODE_ID=cache3
+      - PORT=${CACHE3_PORT:-8003}
+      - PEERS=${PEERS_CACHE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${CACHE3_PORT:-8003}:${CACHE3_PORT:-8003}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  queue1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queue
+    env_file:
+      - ../.env
+    command: python -m src.nodes.queue_node
+    environment:
+      - NODE_ID=queue1
+      - PORT=${QUEUE1_PORT:-8004}
+      - PEERS=${PEERS_QUEUE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${QUEUE1_PORT:-8004}:${QUEUE1_PORT:-8004}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  queue2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queue
+    env_file:
+      - ../.env
+    command: python -m src.nodes.queue_node
+    environment:
+      - NODE_ID=queue2
+      - PORT=${QUEUE2_PORT:-8005}
+      - PEERS=${PEERS_QUEUE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${QUEUE2_PORT:-8005}:${QUEUE2_PORT:-8005}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  queue3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.queue
+    env_file:
+      - ../.env
+    command: python -m src.nodes.queue_node
+    environment:
+      - NODE_ID=queue3
+      - PORT=${QUEUE3_PORT:-8006}
+      - PEERS=${PEERS_QUEUE:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${QUEUE3_PORT:-8006}:${QUEUE3_PORT:-8006}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  lock1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.lock
+    env_file:
+      - ../.env
+    command: python -m src.nodes.lock_manager
+    environment:
+      - NODE_ID=lock1
+      - PORT=${LOCK1_PORT:-8007}
+      - PEERS=${PEERS_LOCK:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${LOCK1_PORT:-8007}:${LOCK1_PORT:-8007}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  lock2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.lock
+    env_file:
+      - ../.env
+    command: python -m src.nodes.lock_manager
+    environment:
+      - NODE_ID=lock2
+      - PORT=${LOCK2_PORT:-8008}
+      - PEERS=${PEERS_LOCK:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${LOCK2_PORT:-8008}:${LOCK2_PORT:-8008}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  lock3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.lock
+    env_file:
+      - ../.env
+    command: python -m src.nodes.lock_manager
+    environment:
+      - NODE_ID=lock3
+      - PORT=${LOCK3_PORT:-8009}
+      - PEERS=${PEERS_LOCK:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "${LOCK3_PORT:-8009}:${LOCK3_PORT:-8009}"
+    networks:
+      - dist-net
+    depends_on:
+      - redis
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    ports:
+      - "8080:8080"
+    environment:
+      - SWAGGER_JSON=/docs/api_spec.yaml
+    volumes:
+      - ../docs:/docs
+    networks:
+      - dist-net
+  locust:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ../tests:/mnt/locust
+    command: -f /mnt/locust/performance/test_performance.py
+    networks:
+      - dist-net
+    depends_on:
+      - lock1
+      - lock2
+      - lock3
+      - queue1
+      - queue2
+      - queue3
+      - cache1
+      - cache2
+      - cache3
+
+networks:
+  dist-net:
+    driver: bridge
